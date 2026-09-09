@@ -84,7 +84,7 @@ def test_listar_imoveis_com_dados (mock_conectar_banco, client):
     mock_conn.close.assert_called_once()
 
 @patch("api.conectar_banco")
-def test_imovel_id_especifico(mock_conectar_banco, client):
+def test_imovel_id_especifico_ok(mock_conectar_banco, client):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
 
@@ -108,7 +108,7 @@ def test_imovel_id_especifico(mock_conectar_banco, client):
         }
 
     mock_cursor.execute.assert_called_once_with(
-        "SELECT * FROM imoveis WHERE id = ?",
+        "SELECT * FROM imoveis WHERE id = %s",
         (1,)
     )
     mock_cursor.fetchone.assert_called_once()
@@ -116,24 +116,69 @@ def test_imovel_id_especifico(mock_conectar_banco, client):
     mock_conn.close.assert_called_once()
 
 @patch("api.conectar_banco")
-def test_imovel_id_especifico_falha(mock_conectar_banco, client):
+def test_imovel_id_especifico_erro(mock_conectar_banco, client):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
+    mock_conn.return_value = mock_cursor
 
-    mock_conn.cursor.return_value = mock_cursor
-
-    mock_cursor.fetchone.return_value = None
+    mock_cursor.fetchone = None
     mock_conectar_banco.return_value = mock_conn
 
-    response = client.get("/imoveis/999")
-    assert response.status_code == 404
-    assert response.get_json() == {"erro": "imóvel não encontrado"}
+    response = client.get("/imoveis/1")
+
+    assert response.status_code == 400
+    assert response.get_json() == {"erro":"Imóvel não encontrado"}
 
     mock_cursor.execute.assert_called_once_with(
-        "SELECT * FROM imoveis WHERE id = ?",
-        (999,)
+        "SELECT * FROM imoveis WHERE id = %s",
+        (1, ), 
     )
-
     mock_cursor.fetchone.assert_called_once()
     mock_cursor.close.assert_called_once()
     mock_conn.close.assert_called_once()
+
+
+@patch("api.conectar_banco")
+def test_adicionar_novo_imovel_ok (mock_conectar_banco, client):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+
+    mock_cursor.lastrowid = 1
+
+    mock_conectar_banco.return_value = mock_conn
+
+    payload = {
+            "id": 1,
+            "logradouro": "Nicole Common",
+            "tipo_logradouro": "Travessa",
+            "bairro": "Lake Danielle",
+            "cidade": "Judymouth",
+            "cep": "85184",
+            "tipo": "casa em condominio",
+            "valor": 488423.52,
+            "data_aquisicao": "2017-07-29"
+    }
+    response = client.post("/imoveis", json=payload)
+
+    assert response.status_code == 200
+    assert response.get_json() == {"id":1}
+
+    mock_cursor.execute.assert_called_once_with(
+        "INSERT INTO imoveis (logradouro, tipo_logradoura, bairro, cidade, cep, tipo, valor, data_aquisicao) VALUES (%s, %s, %s, %s ,%s, %s, %s, %s)",
+        ("Nicole Common", "Travessa", "Lake Danielle", "Judymouth", "85184", "casa em condominio", 488423.52, "2017-07-29"),
+    )
+
+    mock_conn.commit.assert_called_once()
+    mock_cursor.close.assert_called_once()
+    mock_conn.close.assert_called_once()
+
+
+@patch("api.conectar_banco")
+def test_adicionar_novo_imovel_erro (mock_conectar_banco, client):
+    response = client.post("/imoveis", json={"logradouro":"Sé"})
+
+    assert response.status_code == 400
+    assert response.get_json() == {"erro":"Imóvel não encontrado"}
+
+    mock_conectar_banco.assert_not_called()
