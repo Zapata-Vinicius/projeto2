@@ -131,7 +131,7 @@ def test_imovel_id_especifico_erro(mock_conectar_banco, client):
 
     mock_cursor.execute.assert_called_once_with(
         "SELECT * FROM imoveis WHERE id = %s",
-        (1, ),
+        (1, ), 
     )
     mock_cursor.fetchone.assert_called_once()
     mock_cursor.close.assert_called_once()
