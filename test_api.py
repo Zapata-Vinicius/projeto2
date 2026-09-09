@@ -114,3 +114,26 @@ def test_imovel_id_especifico(mock_conectar_banco, client):
     mock_cursor.fetchone.assert_called_once()
     mock_cursor.close.assert_called_once()
     mock_conn.close.assert_called_once()
+
+@patch("api.conectar_banco")
+def test_imovel_id_especifico_falha(mock_conectar_banco, client):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+
+    mock_conn.cursor.return_value = mock_cursor
+
+    mock_cursor.fetchone.return_value = None
+    mock_conectar_banco.return_value = mock_conn
+
+    response = client.get("/imoveis/999")
+    assert response.status_code == 404
+    assert response.get_json() == {"erro": "imóvel não encontrado"}
+
+    mock_cursor.execute.assert_called_once_with(
+        "SELECT * FROM imoveis WHERE id = ?",
+        (999,)
+    )
+
+    mock_cursor.fetchone.assert_called_once()
+    mock_cursor.close.assert_called_once()
+    mock_conn.close.assert_called_once()
