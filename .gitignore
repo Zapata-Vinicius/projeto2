@@ -218,3 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 .env
+ca.pem
+__pycache__/
+.pytest_cache/
