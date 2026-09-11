@@ -409,7 +409,7 @@ def test_buscar_imoveis_cidade (mock_conectar_banco, client):
     mock_conn.close.assert_called_once()
 
 @patch("api.conectar_banco")
-def test_buscar_imoveis_tipo_erro(mock_conectar_banco, client):
+def test_buscar_imoveis_cidade_erro(mock_conectar_banco, client):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
@@ -422,7 +422,7 @@ def test_buscar_imoveis_tipo_erro(mock_conectar_banco, client):
     assert response.get_json() == {"erro": "Nenhum imóvel encontrado"}
 
     mock_cursor.execute.assert_called_once_with(
-        "SELECT * FROM imoveis WHERE tipo = %s",
+        "SELECT * FROM imoveis WHERE cidade = %s",
         ("São Paulo",)
     )
     mock_cursor.fetchall.assert_called_once()
