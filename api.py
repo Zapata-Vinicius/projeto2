@@ -48,7 +48,7 @@ def listar_imoveis ():
         conn.close()
 
         if not imoveis:
-            return jsonify({"erro":"nenhum imóvel encontrado"}), 404
+            return jsonify({"erro":"Nenhum imóvel encontrado"}), 404
 
         return jsonify([imovel_to_dict(i) for i in imoveis]), 200
 
@@ -59,7 +59,7 @@ def listar_imoveis ():
         conn.close()
 
         if not imoveis:
-            return jsonify({"erro":"nenhum imóvel encontrado"}),404
+            return jsonify({"erro":"Nenhum imóvel encontrado"}),404
 
         return jsonify([imovel_to_dict(i) for i in imoveis]), 200
 
