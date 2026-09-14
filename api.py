@@ -71,6 +71,130 @@ def listar_imoveis ():
 
     return jsonify([imovel_to_dict(t) for t in imoveis]), 200
 
+@app.route("/imoveis/<int:id>", methods=["GET"])
+def buscar_imovel(id):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM imoveis WHERE id = %s",
+        (id,)
+    )
+
+    imovel = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if not imovel:
+        return jsonify({"erro": "Imóvel não encontrado"}), 404
+
+    return jsonify(imovel_to_dict(imovel)), 200
+
+@app.route("/imoveis", methods=["POST"])
+def adicionar_imovel():
+    imovel = request.get_json()
+    campos_obrigatorios = [
+        "logradouro",
+        "tipo_logradouro",
+        "bairro",
+        "cidade",
+        "cep",
+        "tipo",
+        "valor",
+        "data_aquisicao"
+    ]
+
+    if imovel is None or any(campo not in imovel for campo in campos_obrigatorios):
+        return jsonify({
+            "erro": "Campos obrigatórios: logradouro, tipo_logradouro, bairro, cidade, cep, tipo, valor, data_aquisicao"
+        }), 400
+    
+    conn = conectar_banco()
+    cursor = conn.cursor()
+
+    logradouro =  imovel.get("logradouro")
+    tipo_logradouro =  imovel.get("tipo_logradouro")
+    bairro =  imovel.get("bairro")
+    cidade =  imovel.get("cidade")
+    cep =  imovel.get("cep")
+    tipo =  imovel.get("tipo")
+    valor =  imovel.get("valor")
+    data_aquisicao =  imovel.get("data_aquisicao")
+
+    cursor.execute("INSERT INTO imoveis (logradouro, tipo_logradouro, bairro, cidade, cep, tipo, valor, data_aquisicao) VALUES (%s, %s, %s, %s ,%s, %s, %s, %s)",
+                   (logradouro, tipo_logradouro, bairro, cidade, cep, tipo, valor, data_aquisicao))
+    conn.commit()
+    id = cursor.lastrowid
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({"id":id}), 201
+
+@app.route("/imoveis/<int:id>", methods=["PUT"])
+def atualizar_imovel(id):
+    imovel = request.get_json()
+    campos_obrigatorios = [
+    "logradouro",
+    "tipo_logradouro",
+    "bairro",
+    "cidade",
+    "cep",
+    "tipo",
+    "valor",
+    "data_aquisicao"
+]
+    if imovel is None or any(campo not in imovel for campo in campos_obrigatorios):
+        return jsonify({
+            "erro": "Campos obrigatórios: logradouro, tipo_logradouro, bairro, cidade, cep, tipo, valor, data_aquisicao"
+        }), 400
+    
+    conn = conectar_banco()
+    cursor = conn.cursor()
+
+    logradouro =  imovel.get("logradouro")
+    tipo_logradouro =  imovel.get("tipo_logradouro")
+    bairro =  imovel.get("bairro")
+    cidade =  imovel.get("cidade")
+    cep =  imovel.get("cep")
+    tipo =  imovel.get("tipo")
+    valor =  imovel.get("valor")
+    data_aquisicao =  imovel.get("data_aquisicao")
+
+    cursor.execute("UPDATE imoveis SET logradouro = %s , tipo_logradouro = %s , bairro = %s , cidade = %s , cep = %s , tipo = %s , valor = %s , data_aquisicao = %s WHERE id  = %s ",
+                    (logradouro, tipo_logradouro, bairro, cidade, cep, tipo, valor, data_aquisicao, id))
+    conn.commit()
+
+    if cursor.rowcount == 0:
+        cursor.close()
+        conn.close()
+        return jsonify({"erro": "Imóvel não encontrado"}), 404
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({"mensagem": "Imóvel atualizado com sucesso!"}), 200
+
+@app.route("/imoveis/<int:id>", methods=["DELETE"])
+def deletar_imovel(id):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM imoveis WHERE id= %s",
+            (id,))
+    conn.commit()
+
+    if cursor.rowcount == 0:
+        cursor.close()
+        conn.close()
+        return jsonify({"erro": "Imóvel não encontrado"}), 404
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({"mensagem": "Imóvel apagado com sucesso!"}), 200
+
 
 if __name__ == "__main__":
     app.run(debug=True)
