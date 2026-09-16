@@ -23,7 +23,7 @@ def test_listar_imoveis_vazios (mock_conectar_banco, client):
     response = client.get("/imoveis")
 
     assert response.status_code == 200
-    assert response.get_json() == []
+    assert response.get_json()["imoveis"] == []
 
     mock_cursor.execute.assert_called_once_with (
         "SELECT * FROM imoveis"
@@ -50,9 +50,10 @@ def test_listar_imoveis_com_dados (mock_conectar_banco, client):
     response = client.get("/imoveis")
 
     assert response.status_code == 200
-    assert response.get_json() == [
+    assert response.get_json()["imoveis"] == [
         {
             "id": 1,
+            "_links": links_esperados(1),
             "logradouro": "Nicole Common",
             "tipo_logradouro": "Travessa",
             "bairro": "Lake Danielle",
@@ -64,6 +65,7 @@ def test_listar_imoveis_com_dados (mock_conectar_banco, client):
         },
         {
             "id": 2,
+            "_links": links_esperados(2),
             "logradouro": "Price Prairie",
             "tipo_logradouro": "Travessa",
             "bairro": "Colonton",
@@ -97,6 +99,7 @@ def test_imovel_id_especifico_ok(mock_conectar_banco, client):
     assert response.status_code == 200
     assert response.get_json() =={
             "id": 1,
+            "_links": links_esperados(1),
             "logradouro": "Nicole Common",
             "tipo_logradouro": "Travessa",
             "bairro": "Lake Danielle",
@@ -161,7 +164,8 @@ def test_adicionar_novo_imovel_ok (mock_conectar_banco, client):
     response = client.post("/imoveis", json=payload)
 
     assert response.status_code == 201
-    assert response.get_json() == {"id":1}
+    assert response.get_json() == {"id":1, "_links": links_esperados(1)}
+    assert response.headers["Location"] == "/imoveis/1"
 
     mock_cursor.execute.assert_called_once_with(
         "INSERT INTO imoveis (logradouro, tipo_logradouro, bairro, cidade, cep, tipo, valor, data_aquisicao) VALUES (%s, %s, %s, %s ,%s, %s, %s, %s)",
@@ -205,7 +209,7 @@ def test_atualizar_imovel(mock_conectar_banco, client):
     response = client.put("/imoveis/1", json=payload)
 
     assert response.status_code == 200
-    assert response.get_json() == {"mensagem": "Imóvel atualizado com sucesso!"}
+    assert response.get_json() == {"mensagem": "Imóvel atualizado com sucesso!", "_links": links_esperados(1)}
 
     mock_cursor.execute.assert_called_once_with(
         "UPDATE imoveis SET logradouro = %s , tipo_logradouro = %s , bairro = %s , cidade = %s , cep = %s , tipo = %s , valor = %s , data_aquisicao = %s WHERE id  = %s ",
@@ -245,7 +249,7 @@ def test_imovel_nao_encontrado_atualizando(mock_conectar_banco, client):
         "valor": 488423.52,
         "data_aquisicao": "2017-07-29"
     }
-    response = client.put("/imoveis/999", json=payload)
+    response = client.put("/imoveis/9999", json=payload)
 
     assert response.status_code == 404
     assert response.get_json() == {"erro": "Imóvel não encontrado"}
@@ -265,7 +269,7 @@ def test_deletar_imovel(mock_conectar_banco, client):
     response = client.delete("/imoveis/1")
 
     assert response.status_code == 200
-    assert response.get_json() == {"mensagem": "Imóvel apagado com sucesso!"}
+    assert response.get_json() == {"mensagem": "Imóvel apagado com sucesso!", "_links": {"collection": {"href": "/imoveis", "method": "GET"}}}
 
     mock_cursor.execute.assert_called_once_with(
         "DELETE FROM imoveis WHERE id= %s",
@@ -284,14 +288,14 @@ def test_falha_ao_deletar(mock_conectar_banco, client):
 
     mock_cursor.rowcount = 0
     mock_conectar_banco.return_value = mock_conn
-    response = client.delete("/imoveis/999")
+    response = client.delete("/imoveis/9999")
 
     assert response.status_code == 404
     assert response.get_json() == {"erro": "Imóvel não encontrado"}
 
     mock_cursor.execute.assert_called_once_with(
         "DELETE FROM imoveis WHERE id= %s",
-        (999,)
+        (9999,)
     )
 
     mock_conn.commit.assert_called_once()
@@ -320,9 +324,10 @@ def test_buscar_imoveis_tipo(mock_conectar_banco, client):
     ]
     response = client.get("/imoveis?tipo=casa")
     assert response.status_code == 200
-    assert response.get_json() == [
+    assert response.get_json()["imoveis"] == [
         {
             "id": 1,
+            "_links": links_esperados(1),
             "logradouro": "Nicole Common",
             "tipo_logradouro": "Travessa",
             "bairro": "Lake Danielle",
@@ -386,9 +391,10 @@ def test_buscar_imoveis_cidade (mock_conectar_banco, client):
     ]
     response = client.get("/imoveis?cidade=Judymouth")
     assert response.status_code == 200
-    assert response.get_json() == [
+    assert response.get_json()["imoveis"] == [
         {
             "id": 1,
+            "_links": links_esperados(1),
             "logradouro": "Nicole Common",
             "tipo_logradouro": "Travessa",
             "bairro": "Lake Danielle",
@@ -428,3 +434,37 @@ def test_buscar_imoveis_cidade_erro(mock_conectar_banco, client):
     mock_cursor.fetchall.assert_called_once()
     mock_cursor.close.assert_called_once()
     mock_conn.close.assert_called_once()
+
+
+def links_esperados(id):
+    return {
+        "self": {"href": f"/imoveis/{id}", "method": "GET"},
+        "collection": {"href": "/imoveis", "method": "GET"},
+        "atualizar": {"href": f"/imoveis/{id}", "method": "PUT"},
+        "remover": {"href": f"/imoveis/{id}", "method": "DELETE"}
+    }
+
+
+@patch("api.conectar_banco")
+def test_links_colecao_vazia(mock_banco, client):
+    mock_banco.return_value.cursor.return_value.fetchall.return_value = []
+    response = client.get("/imoveis")
+    links = response.get_json()["_links"]
+    assert links["self"] == {"href": "/imoveis", "method": "GET"}
+    assert links["criar"] == {"href": "/imoveis", "method": "POST"}
+    assert links["buscar_por_tipo"]["href"] == "/imoveis?tipo={tipo}"
+    assert links["buscar_por_cidade"]["href"] == "/imoveis?cidade={cidade}"
+
+
+@patch("api.conectar_banco")
+def test_seguir_link_do_imovel(mock_banco, client):
+    row = (7, "Rua Teste", "Rua", "Centro", "Cidade Teste", "12345", "casa", 100, "2026-09-16")
+    cursor = mock_banco.return_value.cursor.return_value
+    cursor.fetchall.return_value = [row]
+    cursor.fetchone.return_value = row
+    lista = client.get("/imoveis?tipo=casa").get_json()
+    assert lista["_links"]["self"]["href"] == "/imoveis?tipo=casa"
+    link = lista["imoveis"][0]["_links"]["self"]
+    response = client.open(link["href"], method=link["method"])
+    assert response.status_code == 200
+    assert response.get_json()["id"] == 7
