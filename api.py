@@ -1,4 +1,4 @@
-from flask import app, Flask, request, jsonify
+from flask import app, Flask, request, jsonify, url_for
 import mysql.connector
 from dotenv import load_dotenv
 import os
@@ -20,6 +20,29 @@ def conectar_banco():
         ssl_verify_cert=True
     )
 
+def links_imovel(id):
+    return {
+        "self": {"href": url_for("buscar_imovel", id=id), "method": "GET"},
+        "collection": {"href": url_for("listar_imoveis"), "method": "GET"},
+        "atualizar": {"href": url_for("atualizar_imovel", id=id), "method": "PUT"},
+        "remover": {"href": url_for("deletar_imovel", id=id), "method": "DELETE"}
+    }
+
+
+def resposta_lista(imoveis):
+    url = url_for("listar_imoveis")
+    return jsonify({
+        "imoveis": [imovel_to_dict(i) for i in imoveis],
+        "_links": {
+            "self": {"href": request.full_path.rstrip("?"), "method": "GET"},
+            "collection": {"href": url, "method": "GET"},
+            "criar": {"href": url_for("adicionar_imovel"), "method": "POST"},
+            "buscar_por_tipo": {"href": url + "?tipo={tipo}", "method": "GET", "templated": True},
+            "buscar_por_cidade": {"href": url + "?cidade={cidade}", "method": "GET", "templated": True}
+        }
+    })
+
+
 def imovel_to_dict (row):
     return {
         "id": row[0],
@@ -30,7 +53,8 @@ def imovel_to_dict (row):
         "cep": row[5],
         "tipo": row[6],
         "valor": float(row[7]),
-        "data_aquisicao": row[8]
+        "data_aquisicao": row[8],
+        "_links": links_imovel(row[0])
     }
 
 @app.route("/imoveis", methods=['GET'])
@@ -50,7 +74,7 @@ def listar_imoveis ():
         if not imoveis:
             return jsonify({"erro":"Nenhum imóvel encontrado"}), 404
 
-        return jsonify([imovel_to_dict(i) for i in imoveis]), 200
+        return resposta_lista(imoveis), 200
 
     if cidade:
         cursor.execute("SELECT * FROM imoveis WHERE cidade = %s", (cidade,))
@@ -61,7 +85,7 @@ def listar_imoveis ():
         if not imoveis:
             return jsonify({"erro":"Nenhum imóvel encontrado"}),404
 
-        return jsonify([imovel_to_dict(i) for i in imoveis]), 200
+        return resposta_lista(imoveis), 200
 
     cursor.execute("SELECT * FROM imoveis")
     imoveis = cursor.fetchall()
@@ -69,7 +93,7 @@ def listar_imoveis ():
     cursor.close()
     conn.close()
 
-    return jsonify([imovel_to_dict(t) for t in imoveis]), 200
+    return resposta_lista(imoveis), 200
 
 @app.route("/imoveis/<int:id>", methods=["GET"])
 def buscar_imovel(id):
@@ -130,7 +154,7 @@ def adicionar_imovel():
     cursor.close()
     conn.close()
 
-    return jsonify({"id":id}), 201
+    return jsonify({"id":id, "_links": links_imovel(id)}), 201, {"Location": url_for("buscar_imovel", id=id)}
 
 @app.route("/imoveis/<int:id>", methods=["PUT"])
 def atualizar_imovel(id):
@@ -174,7 +198,7 @@ def atualizar_imovel(id):
     cursor.close()
     conn.close()
 
-    return jsonify({"mensagem": "Imóvel atualizado com sucesso!"}), 200
+    return jsonify({"mensagem": "Imóvel atualizado com sucesso!", "_links": links_imovel(id)}), 200
 
 @app.route("/imoveis/<int:id>", methods=["DELETE"])
 def deletar_imovel(id):
@@ -193,7 +217,9 @@ def deletar_imovel(id):
     cursor.close()
     conn.close()
 
-    return jsonify({"mensagem": "Imóvel apagado com sucesso!"}), 200
+    return jsonify({"mensagem": "Imóvel apagado com sucesso!", "_links": {
+        "collection": {"href": url_for("listar_imoveis"), "method": "GET"}
+    }}), 200
 
 
 if __name__ == "__main__":
